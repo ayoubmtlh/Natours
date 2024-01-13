@@ -1,5 +1,6 @@
 // THIRD SECTION CODE const fs = require("fs")
 const Tour=require("./../models/tourModel")
+const APIFeatures=require("./../utils/apiFeatures")
 /*// THIRD SECTION CODE const tr = JSON.parse(
     fs.readFileSync(`${__dirname}/../dev-data/data/tours-simple.json`)
   ); */
@@ -19,9 +20,107 @@ const Tour=require("./../models/tourModel")
    next()
 
 }*/
+exports.getMonthlyPlan=async(req,res)=>{
+  try{ 
+    const year=req.params.year*1
+
+    const plan=await Tour.aggregate([
+
+      {
+        $unwind: "$startDates"
+      },{
+        $match:{startDates:{
+          $gte: new Date(`${year}-01-01`),
+          $lte:new Date(`${year}-12-31`)
+        }}
+      },
+   
+      {
+        $group:{
+          _id:{$month:'$startDates'},
+          numToursStarts:{$sum:1},
+          tours:{$push:"$name"}
+        }
+      },   {
+        $addFields:{month:"$_id"}
+      },{
+        $project:{_id:0}
+      },{
+        $sort:{numToursStarts:-1}
+      },{
+        $limit:12
+      }
+    
+     ])
+     return res.status(200).json({
+      status:"success",
+      /*result:Tour.length,*/
+      data:{
+        plan
+      }
+    
+     })
+
+  }
+  catch(err){ 
+    return res.status(404).json({
+        status:'fail',
+        message:"something went wrong: "+err
+      })
+    
+    }
+}
+exports.getTourStat=async(req,res)=>{
+  try{
+     const stats=await Tour.aggregate([
+      {
+        $match:{ratingsAverage :{$gte: 4.5}}
+      },
+      {
+        $group:{
+          _id:{ $toUpper: '$difficulty'} ,
+          avgRating:{$avg:'$ratingsAverage'},
+          avgPrice:{$avg:'$price'},
+          minRating:{$min:'$price'},
+          maxRating:{$max:'$price'},
+
+        }
+      },
+       {$sort:{avgPrice:1}
+             
+      },{$match : {_id:{$ne : "EASY"}}} 
+     ])
+     return res.status(200).json({
+      status:"success",
+      result:Tour.length,
+      data:{
+        stats
+      }
+    
+     })
+     }
+  
+  catch(err){ 
+    return res.status(404).json({
+        status:'fail',
+        message:"something went wrong: "+err
+      })
+    
+    }
+
+}
+exports.getAlias=async (req,res,next) => {
+     req.query.limit='5'
+     req.query.sort="-ratingsAverage,price"
+     req.query.fields="name,price,ratingAverage,summary,difficulty"
+     next()
+}
+
+
 
 exports.getAllTours = async (req, res) => {
  try{
+ /*  //1)filtering
   let objectQuery={...req.query}
   const excludedFields=['page','sort','limit','fields']
   excludedFields.forEach(el=>delete objectQuery[el])
@@ -29,16 +128,37 @@ exports.getAllTours = async (req, res) => {
   queryStr=queryStr.replace(/\b(gt|gte|lt|lte)\b/g,match=>`$${match}`)
   let query=Tour.find(JSON.parse(queryStr))
   console.log(JSON.parse(queryStr))
+  console.log(queryStr)
+  console.log(objectQuery)
+
+  //2)Sorting
   if(req.query.sort){
     const querySort=req.query.sort.split(",").join(' ')
     console.log(querySort)
     query=query.sort(querySort)
   }
+
+
   else{
     query=query.sort("-createdAt")
   }
-
-  const tours=await query
+  const feature=new APIFeatures(Tour.find(),req.query).filter().sort()
+  //3)fields
+  if(req.query.fields){
+   const fields=req.query.fields.split(",").join(" ")
+    query.select(fields)
+  }
+//4)pagination and limits
+  const limit=req.query.limit*1 || 100
+  const page= req.query.page*1 || 1
+  const skip= (page-1)*limit
+  query=query.skip(skip).limit(limit)
+  if(req.query.page){
+    const numTours=await Tour.countDocuments()
+    if(skip>=numTours) throw new Error("this page is not exist ")
+  }*/
+  const feature=new APIFeatures(Tour.find(),req.query).filter().sort().fields().pagination()
+  const tours=await feature.query
  return res.status(200).json({
   status:"success",
   result:tours.length,
@@ -47,16 +167,18 @@ exports.getAllTours = async (req, res) => {
   }
 
  })
- 
-}
+ }
 catch(err){
-  return res.status(404).json({
+return res.status(404).json({
     status:'fail',
-    message:"something go wrong: "+err
+    message:"something went wrong: "+err
   })
 
 }
+ 
+
 }
+
 
   // THIRD SECTION CODE
    /* return res.status(200).json({
