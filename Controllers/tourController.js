@@ -1,6 +1,8 @@
 // THIRD SECTION CODE const fs = require("fs")
 const Tour=require("./../models/tourModel")
 const APIFeatures=require("./../utils/apiFeatures")
+const catchAsync=require("./../utils/cacthAsync")
+const AppError=require("./../utils/appError")
 /*// THIRD SECTION CODE const tr = JSON.parse(
     fs.readFileSync(`${__dirname}/../dev-data/data/tours-simple.json`)
   ); */
@@ -20,8 +22,8 @@ const APIFeatures=require("./../utils/apiFeatures")
    next()
 
 }*/
-exports.getMonthlyPlan=async(req,res)=>{
-  try{ 
+exports.getMonthlyPlan=catchAsync(async(req,res,next)=>{
+  
     const year=req.params.year*1
 
     const plan=await Tour.aggregate([
@@ -61,17 +63,10 @@ exports.getMonthlyPlan=async(req,res)=>{
     
      })
 
-  }
-  catch(err){ 
-    return res.status(404).json({
-        status:'fail',
-        message:"something went wrong: "+err
-      })
-    
-    }
-}
-exports.getTourStat=async(req,res)=>{
-  try{
+  })
+
+exports.getTourStat=catchAsync(async(req,res,next)=>{
+
      const stats=await Tour.aggregate([
       {
         $match:{ratingsAverage :{$gte: 4.5}}
@@ -98,28 +93,21 @@ exports.getTourStat=async(req,res)=>{
       }
     
      })
-     }
-  
-  catch(err){ 
-    return res.status(404).json({
-        status:'fail',
-        message:"something went wrong: "+err
-      })
-    
-    }
+     })
 
-}
-exports.getAlias=async (req,res,next) => {
+
+
+exports.getAlias=catchAsync(async (req,res,next) => {
      req.query.limit='5'
      req.query.sort="-ratingsAverage,price"
      req.query.fields="name,price,ratingAverage,summary,difficulty"
      next()
-}
+})
 
 
 
-exports.getAllTours = async (req, res) => {
- try{
+exports.getAllTours = catchAsync(async (req, res,next) => {
+
  /*  //1)filtering
   let objectQuery={...req.query}
   const excludedFields=['page','sort','limit','fields']
@@ -167,17 +155,10 @@ exports.getAllTours = async (req, res) => {
   }
 
  })
- }
-catch(err){
-return res.status(404).json({
-    status:'fail',
-    message:"something went wrong: "+err
-  })
-
-}
+ })
  
 
-}
+
 
 
   // THIRD SECTION CODE
@@ -191,9 +172,12 @@ return res.status(404).json({
       });*/
   
   
-  exports.getTourbyID = async(req, res) => {
-    try{
+  exports.getTourbyID =catchAsync( async(req, res,next) => {
+
      const tour= await Tour.findById(req.params.id)
+     if(!tour){
+      return next(new AppError("this tour is not exist",404))
+     }
      return res.status(200).json({
       status:"success",
       data:{
@@ -201,13 +185,8 @@ return res.status(404).json({
       }
     
      })
-    }
-    catch(err){
-      return res.status(404).json({
-        status:'fail',
-        message:"something go wrong" + err
-      })
-    }
+    })
+    
     // THIRD SECTION CODE
     /*
     console.log(req.params)
@@ -220,10 +199,9 @@ return res.status(404).json({
       },
     });
 */
-  }
-  exports.createAtour = async(req, res) => {
+  
+  exports.createAtour =catchAsync( async(req, res,next) => {
 
-    try{
       const newTour= await Tour.create(req.body)
       res.status(201).json({
         status:'success',
@@ -231,22 +209,17 @@ return res.status(404).json({
           tour:newTour
         }
       })
-    }catch(err){
-      res.status(400).json({
-        status:'fail',
-        message:'invalid data sent'
+    })
 
-      }
-    )}
-    }
-
-    exports.updateAtour = async(req, res) =>{
-      try{
+    exports.updateAtour = catchAsync( async(req, res,next) =>{
 
       const tour=await Tour.findByIdAndUpdate(req.params.id,req.body,{
         new:true,
         runValidators:true
       })
+      if(!tour){
+        return next(new AppError("this tour is not exist",404))
+       }
 
       res.status(203).json({
         status:'success',
@@ -254,15 +227,7 @@ return res.status(404).json({
           tour:tour
         }
       })
-      }
-      catch(err){  res.status(400).json({
-        status:'fail',
-        message:'invalid data sent'
-
-      }
-
-      )
-    }
+      })
     // THIRD SECTION CODE
     /*
     const newId = tr[tr.length - 1].id + 1;
@@ -287,7 +252,7 @@ return res.status(404).json({
       }
     );
     */
-  };
+  
   
   //exports.updateAtour = (req, res) => {
     // THIRD SECTION CODE
@@ -318,25 +283,18 @@ return res.status(404).json({
     */
   
   
-  exports.DeleteAtour = async (req, res) => {
-    try{
-   await Tour.findByIdAndDelete(req.params.id)
+  exports.DeleteAtour = catchAsync(async (req, res,next) => {
+
+   const tour=await Tour.findByIdAndDelete(req.params.id)
+   if(!tour){
+    return next(new AppError("this tour is not exist",404))
+   }
     
     res.status(204).json({
       status:'success',
     })
-    }
-    catch(err){
-      res.status(400).json({
-        status:'fail',
-        message:'invalid data sent'
+    })
 
-      }
-
-      )
-
-
-    }
     // THIRD SECTION CODE
     /*
     const id = req.params.id * 1;
@@ -360,4 +318,4 @@ return res.status(404).json({
           },
         });
         
-      })*/}
+      })*/
